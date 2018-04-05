@@ -235,7 +235,7 @@ public class Knight implements Runnable {
     private boolean isAbleToTalk() {
         return nextKnight().getState() != KnightState.talking
                 && previousKnight().getState() != KnightState.talking
-                && knights.get(PartyHelper.kingId).getState() != KnightState.talking;
+                && (amIKing() || knights.get(PartyHelper.kingId).getState() != KnightState.talking);
     }
 
     private Knight previousKnight() {
