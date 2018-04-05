@@ -2,6 +2,7 @@ package com.company;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Scanner;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.IntStream;
@@ -24,7 +25,8 @@ class Main {
         var wineCups = new ArrayList<WineCup>(n / 2);
         var centralWine = new WineCup(PartyHelper.maximumCentralWineGillCapacity);
         var partyLock = new ReentrantLock();
-        var knightsToCheckAndWake = new ArrayDeque<CheckAndWaitUnit>();
+        var knightsToCheckAndWakeQueue = new ArrayDeque<CheckAndWaitUnit>();
+        var knightsToCheckAndWakeSet = new HashSet<Knight>();
         final var nFinal = n;
         IntStream.range(0, n / 2).forEach(i -> {
             plates.add(new Plate(PartyHelper.maximumPlateCucumberCapacity));
@@ -32,14 +34,14 @@ class Main {
         });
 
         IntStream.range(0, n).forEach(i -> knights.add(
-                new Knight(nFinal, i, knights, partyLock, wineCups, plates, centralWine, knightsToCheckAndWake)
+                new Knight(nFinal, i, knights, partyLock, wineCups, plates, centralWine, knightsToCheckAndWakeQueue, knightsToCheckAndWakeSet)
         ));
 
         // create threads
         knights.forEach(knight -> threads.add(new Thread(knight)));
 
-        threads.add(new Thread(new PickleServant(knights, partyLock, plates, knightsToCheckAndWake)));
-        threads.add(new Thread(new WineGillServant(knights, partyLock, centralWine, knightsToCheckAndWake)));
+        threads.add(new Thread(new PickleServant(knights, partyLock, plates, knightsToCheckAndWakeQueue, knightsToCheckAndWakeSet)));
+        threads.add(new Thread(new WineGillServant(knights, partyLock, centralWine, knightsToCheckAndWakeQueue, knightsToCheckAndWakeSet)));
 
         threads.forEach(Thread::start);
 

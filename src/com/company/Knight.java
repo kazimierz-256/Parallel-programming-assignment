@@ -1,11 +1,11 @@
 package com.company;
 
 import java.util.Deque;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Queue;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
-import java.util.function.Consumer;
-import java.util.function.Predicate;
 
 public class Knight implements Runnable {
     private int drunkenCups = 0;
@@ -18,7 +18,8 @@ public class Knight implements Runnable {
     private List<WineCup> wineCups;
     private List<Plate> plates;
     private WineCup centralWine;
-    private Deque<CheckAndWaitUnit> knightsToCheckAndWake;
+    private Queue<CheckAndWaitUnit> knightsWakeQueue;
+    private HashSet<Knight> knightsWakeSet;
     private KnightState state;
 
     Knight(int n,
@@ -27,13 +28,14 @@ public class Knight implements Runnable {
            Lock partyLock,
            List<WineCup> wineCups,
            List<Plate> plates,
-           WineCup centralWine, Deque<CheckAndWaitUnit> knightsToCheckAndWake) {
+           WineCup centralWine, Deque<CheckAndWaitUnit> knightsWakeQueue, HashSet<Knight> knightsWakeSet) {
         this.n = n;
         thisKnightId = id;
         this.wineCups = wineCups;
         this.plates = plates;
         this.centralWine = centralWine;
-        this.knightsToCheckAndWake = knightsToCheckAndWake;
+        this.knightsWakeQueue = knightsWakeQueue;
+        this.knightsWakeSet = knightsWakeSet;
         state = KnightState.sleeping; // so that knights start sleeping
         this.partyLock = partyLock;
         this.knights = knights;
@@ -53,30 +55,25 @@ public class Knight implements Runnable {
                 case drinking:
                     state = KnightState.awaitingTalk;
 
-                    if (previousKnight().isReadyToDrinkAndEat()) {
-                        knightsToCheckAndWake.addLast(new CheckAndWaitUnit(
+                    if (previousKnight().isReadyToDrinkAndEat() && !knightsWakeSet.contains(previousKnight())) {
+                        knightsWakeQueue.add(new CheckAndWaitUnit(
                                 Knight::isReadyToDrinkAndEat,
                                 previousKnight(),
                                 Knight::enableDrinking
                         ));
                     }
-                    if (nextKnight().isReadyToDrinkAndEat()) {
-                        knightsToCheckAndWake.addLast(new CheckAndWaitUnit(
+                    if (nextKnight().isReadyToDrinkAndEat() && !knightsWakeSet.contains(nextKnight())) {
+                        knightsWakeQueue.add(new CheckAndWaitUnit(
                                 Knight::isReadyToDrinkAndEat,
                                 nextKnight(),
                                 Knight::enableDrinking
                         ));
                     }
 
-                    PartyHelper.signalFirstUnit(knightsToCheckAndWake);
-
                     talk();
                     break;
                 case sleeping:
                     state = KnightState.awaitingDrinking;
-
-                    PartyHelper.signalFirstUnit(knightsToCheckAndWake);
-
                     drink();
                     break;
                 case talking:
@@ -84,8 +81,8 @@ public class Knight implements Runnable {
 
                     if (amIKing()) {
                         for (Knight knight : knights) {
-                            if (knight.isReadyToTalk()) {
-                                knightsToCheckAndWake.push(new CheckAndWaitUnit(
+                            if (knight.isReadyToTalk() && !knightsWakeSet.contains(knight)) {
+                                knightsWakeQueue.add(new CheckAndWaitUnit(
                                         Knight::isReadyToTalk,
                                         knight,
                                         Knight::enableTalking
@@ -93,24 +90,21 @@ public class Knight implements Runnable {
                             }
                         }
                     } else {
-                        if (previousKnight().isReadyToTalk()) {
-                            knightsToCheckAndWake.addLast(new CheckAndWaitUnit(
+                        if (previousKnight().isReadyToTalk() && !knightsWakeSet.contains(previousKnight())) {
+                            knightsWakeQueue.add(new CheckAndWaitUnit(
                                     Knight::isReadyToTalk,
                                     previousKnight(),
                                     Knight::enableTalking
                             ));
                         }
-                        if (nextKnight().isReadyToTalk()) {
-                            knightsToCheckAndWake.addLast(new CheckAndWaitUnit(
+                        if (nextKnight().isReadyToTalk() && !knightsWakeSet.contains(nextKnight())) {
+                            knightsWakeQueue.add(new CheckAndWaitUnit(
                                     Knight::isReadyToTalk,
                                     nextKnight(),
                                     Knight::enableTalking
                             ));
                         }
                     }
-
-                    PartyHelper.signalFirstUnit(knightsToCheckAndWake);
-
                     sleep();
                     break;
             }
@@ -127,9 +121,11 @@ public class Knight implements Runnable {
     private void talk() {
         var time = PartyHelper.getRandomTime(2);
 
+        PartyHelper.signalFirstUnit(knightsWakeQueue, knightsWakeSet);
         // watch out for a spurious wakeup, they really do happen!
         while (!isAbleToTalk()) {
             canTalkNow.awaitUninterruptibly();
+            PartyHelper.signalFirstUnit(knightsWakeQueue, knightsWakeSet);
         }
         state = KnightState.talking;
         System.out.printf("%s TALKING for %f seconds.%n",
@@ -153,6 +149,7 @@ public class Knight implements Runnable {
         System.out.printf("%s SLEEP for %f seconds.%n",
                 describeOneself(), time / 1000d);
 
+        PartyHelper.signalFirstUnit(knightsWakeQueue, knightsWakeSet);
         partyLock.unlock();
 
         try {
@@ -167,9 +164,11 @@ public class Knight implements Runnable {
     }
 
     private void drink() {
+        PartyHelper.signalFirstUnit(knightsWakeQueue, knightsWakeSet);
         // watch out for a spurious wakeup, they really do happen!
         while (!isAbleToDrinkAndEat()) {
             canDrinkAndEatNow.awaitUninterruptibly();
+            PartyHelper.signalFirstUnit(knightsWakeQueue, knightsWakeSet);
         }
         state = KnightState.drinking;
         System.out.printf("%s DRINKING %d'th immediately.%n",
@@ -184,10 +183,10 @@ public class Knight implements Runnable {
         // drink gill
 
         partyLock.lock();
+        System.out.printf("%s finished drinking.%n", describeOneself());
         if (drunkenCups >= PartyHelper.maximumKnightDrinkingCapacity) {
             state = KnightState.knockedOut;
         }
-        wakeSomeKnightToDrinkAndEat();
     }
 
     private void consume(WineGill gill) {
@@ -208,32 +207,6 @@ public class Knight implements Runnable {
             plateId -= n / 2;
         }
         return plates.get(plateId);
-    }
-
-//    private boolean wakeSomeKnightIfNecessary() {
-//        if (cycleLeftTillFirst(Knight::isReadyToTalk, Knight::enableTalking)) {
-//            return true;
-//        } else return cycleLeftTillFirst(Knight::isReadyToDrinkAndEat, Knight::enableDrinking);
-//    }
-
-    private boolean wakeSomeKnightToTalk() {
-        return cycleLeftTillFirst(Knight::isReadyToTalk, Knight::enableTalking);
-    }
-
-    private boolean wakeSomeKnightToDrinkAndEat() {
-        return cycleLeftTillFirst(Knight::isReadyToDrinkAndEat, Knight::enableDrinking);
-    }
-
-    private boolean cycleLeftTillFirst(Predicate<Knight> predicate, Consumer<Knight> consumer) {
-        for (int i = PartyHelper.previousKnightId(thisKnightId, n);
-             i != thisKnightId;
-             i = PartyHelper.previousKnightId(i, n)) {
-            if (predicate.test(knights.get(i))) {
-                consumer.accept(knights.get(i));
-                return true;
-            }
-        }
-        return false;
     }
 
     public void enableDrinking() {
@@ -275,9 +248,9 @@ public class Knight implements Runnable {
 
     private String describeOneself() {
         if (amIKing()) {
-            return String.format("King (id %d).", thisKnightId);
+            return String.format("King (id %d)", thisKnightId);
         } else {
-            return String.format("Knight (id %d).", thisKnightId);
+            return String.format("Knight (id %d)", thisKnightId);
         }
     }
 
@@ -285,19 +258,7 @@ public class Knight implements Runnable {
         return thisKnightId == PartyHelper.kingId;
     }
 
-//    private Knight getCurrentKnight() {
-//        return knights.get(thisKnightId);
-//    }
-
-    private Knight getKing() {
-        return knights.get(PartyHelper.kingId);
-    }
-
     public KnightState getState() {
         return state;
-    }
-
-    public void setState(KnightState state) {
-        this.state = state;
     }
 }

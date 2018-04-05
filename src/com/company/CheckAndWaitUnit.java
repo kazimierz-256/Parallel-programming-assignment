@@ -17,10 +17,14 @@ public class CheckAndWaitUnit implements java.util.function.BooleanSupplier {
 
     @Override
     public boolean getAsBoolean() {
-        if (predicate.test(knight)) {
-            consumer.accept(knight);
+        if (predicate.test(getKnight())) {
+            consumer.accept(getKnight());
             return true;
         }
         return false;
+    }
+
+    public Knight getKnight() {
+        return knight;
     }
 }

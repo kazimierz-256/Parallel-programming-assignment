@@ -2,20 +2,25 @@ package com.company;
 
 import java.util.ArrayDeque;
 import java.util.List;
+import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.locks.Lock;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 class WineGillServant implements Runnable {
     private List<Knight> knights;
     private Lock partyLock;
     private WineCup centralWine;
-    private ArrayDeque<CheckAndWaitUnit> knightsToCheckAndWake;
+    private Queue<CheckAndWaitUnit> knightsWakeQueue;
+    private Set<Knight> knightsWakeSet;
 
-    public WineGillServant(List<Knight> knights, Lock partyLock, WineCup centralWine, ArrayDeque<CheckAndWaitUnit> knightsToCheckAndWake) {
+    public WineGillServant(List<Knight> knights, Lock partyLock, WineCup centralWine, ArrayDeque<CheckAndWaitUnit> knightsWakeQueue, Set<Knight> knightsWakeSet) {
         this.knights = knights;
         this.partyLock = partyLock;
         this.centralWine = centralWine;
-        this.knightsToCheckAndWake = knightsToCheckAndWake;
+        this.knightsWakeQueue = knightsWakeQueue;
+        this.knightsWakeSet = knightsWakeSet;
     }
 
 
@@ -26,7 +31,7 @@ class WineGillServant implements Runnable {
             int time;
             time = PartyHelper.getRandomTime(0.5);
 
-            PartyHelper.signalFirstUnit(knightsToCheckAndWake);
+            PartyHelper.signalFirstUnit(knightsWakeQueue, knightsWakeSet);
             partyLock.unlock();
 
             try {
@@ -39,18 +44,32 @@ class WineGillServant implements Runnable {
             if (PartyHelper.areEveryoneKnockedOut(knights))
                 break;
 
-            if (centralWine.missingGillCount() > 0)
-                System.out.format("Servant added %d wine gills to central wine%n",
-                        centralWine.missingGillCount());
+            boolean missingGills = centralWine.missingGillCount() > 0;
+            if (missingGills)
+                System.out.format("WineServant added %d wine gills to central wine%n", centralWine.missingGillCount());
             else
-                System.out.printf("Servant realised nobody drank the central wine%n");
+                System.out.printf("WineServant realised nobody drank the central wine%n");
 
             IntStream.range(0, centralWine.missingGillCount()).forEach(i ->
                     centralWine.putGill(new WineGill())
             );
 
+            if (missingGills) {
+                knightsWakeQueue.addAll(
+                        knights.stream().
+                                filter(Knight::isReadyToDrinkAndEat).
+                                filter(knight -> !knightsWakeSet.contains(knight)).
+                                map(knight -> new CheckAndWaitUnit(
+                                        Knight::isReadyToDrinkAndEat,
+                                        knight,
+                                        Knight::enableDrinking
+                                )).
+                                collect(Collectors.toList())
+                );
+            }
 
         }
         partyLock.unlock();
+        System.out.println("WineServant has done his job");
     }
 }
