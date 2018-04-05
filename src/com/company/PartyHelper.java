@@ -1,13 +1,14 @@
 package com.company;
 
+import java.util.Deque;
 import java.util.List;
 import java.util.Random;
 
 class PartyHelper {
     static final int maximumKnightDrinkingCapacity = 10;
     static final int kingId = 0;
-    static final int maximumPlateCucumberCapacity = 3;
-    static final int maximumCentralWineGillCapacity = 4;
+    static final int maximumPlateCucumberCapacity = 5;
+    static final int maximumCentralWineGillCapacity = 8;
     private static final int minimumTimeMs = 10;
     private static final int maximumTimeMs = 2 * minimumTimeMs;
 
@@ -21,8 +22,8 @@ class PartyHelper {
         return getRandomInt(minimumTimeMs, maximumTimeMs);
     }
 
-    static int getRandomTime(int factor) {
-        return getRandomTime() * factor;
+    static int getRandomTime(double factor) {
+        return (int) (getRandomTime() * factor);
     }
 
     static int previousKnightId(int id, int n) {
@@ -50,16 +51,12 @@ class PartyHelper {
         return true;
     }
 
-    static boolean wakeUpAnybody(List<Knight> knights) {
-        for (Knight knight : knights) {
-            if (knight.isReadyToDrinkAndEat()) {
-                knight.enableDrinking();
+    public static boolean signalFirstUnit(Deque<CheckAndWaitUnit> checkAndWaitUnits) {
+        while (checkAndWaitUnits.size() > 0) {
+            if (checkAndWaitUnits.pollFirst().getAsBoolean())
                 return true;
-            } else if (knight.isReadyToTalk()) {
-                knight.enableTalking();
-                return true;
-            }
         }
         return false;
     }
+
 }
