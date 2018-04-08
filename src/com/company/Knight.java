@@ -158,7 +158,7 @@ public class Knight implements Runnable {
     private void sleep() {
         var time = PartyHelper.getRandomTime();
 
-        System.out.printf("%s SLEEP for %f seconds.%n",
+        System.out.printf("%s SLEEPING for %f seconds.%n",
                 describeOneself(), time / 1000d);
 
         signalFirstValidUnit();

@@ -19,9 +19,9 @@ class Main {
 
         // generate necessary arrays and threads
         List<Thread> threads;
-        var knights = new ArrayList<Knight>(n);
         List<Plate> plates;
         List<WineCup> wineCups;
+        var knights = new ArrayList<Knight>(n);
         var centralWine = new WineCup(PartyHelper.maximumCentralWineGillCapacity);
         var partyLock = new ReentrantLock();
         var knightsToCheckAndWakeQueue = new ArrayDeque<CheckAndWaitUnit>();
