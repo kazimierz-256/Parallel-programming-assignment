@@ -1,12 +1,11 @@
 package com.company;
 
-import java.util.ArrayDeque;
 import java.util.List;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.locks.Lock;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 class PickleServant implements Runnable {
     private List<Knight> knights;
@@ -15,7 +14,12 @@ class PickleServant implements Runnable {
     private Queue<CheckAndWaitUnit> knightsWakeQueue;
     private Set<Knight> knightsWakeSet;
 
-    public PickleServant(List<Knight> knights, Lock partyLock, List<Plate> plates, ArrayDeque<CheckAndWaitUnit> knightsWakeQueue, Set<Knight> knightsWakeSet) {
+    public PickleServant(
+            List<Knight> knights,
+            Lock partyLock,
+            List<Plate> plates,
+            Queue<CheckAndWaitUnit> knightsWakeQueue,
+            Set<Knight> knightsWakeSet) {
         this.knights = knights;
         this.partyLock = partyLock;
         this.plates = plates;
@@ -31,7 +35,7 @@ class PickleServant implements Runnable {
 
             time = PartyHelper.getRandomTime(0.5);
 
-            PartyHelper.signalFirstUnit(knightsWakeQueue, knightsWakeSet);
+            PartyHelper.signalFirstValidUnit(knightsWakeQueue, knightsWakeSet);
             partyLock.unlock();
 
 
@@ -44,6 +48,7 @@ class PickleServant implements Runnable {
             partyLock.lock();
             if (PartyHelper.areEveryoneKnockedOut(knights))
                 break;
+
             boolean missingPickles = plates.stream().map(Plate::missingPickleCount).anyMatch(count -> count > 0);
 
             if (missingPickles)
@@ -51,20 +56,20 @@ class PickleServant implements Runnable {
             else
                 System.out.println("PickleServant realised nobody ate any pickles");
 
-
-            plates.forEach(plate -> IntStream.range(0, plate.missingPickleCount()).forEach(i ->
-                    plate.putPickle(new Pickle())
-            ));
-
+            for (var plate : plates) {
+                while (plate.missingPickleCount() > 0) {
+                    plate.putPickle(new Pickle());
+                }
+            }
 
             if (missingPickles) {
                 knightsWakeQueue.addAll(
                         knights.stream().
-                                filter(Knight::isReadyToDrinkAndEat).
-                                filter(knight -> !knightsWakeSet.contains(knight)).
+                                filter(Knight::isAwaitingValidlyToDrinkAndEat).
+                                filter(((Predicate<Knight>) knightsWakeSet::contains).negate()).
                                 map(knight -> new CheckAndWaitUnit(
-                                        Knight::isReadyToDrinkAndEat,
                                         knight,
+                                        Knight::isAwaitingValidlyToDrinkAndEat,
                                         Knight::enableDrinking
                                 )).
                                 collect(Collectors.toList())

@@ -1,10 +1,8 @@
 package com.company;
 
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Scanner;
+import java.util.*;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 class Main {
@@ -12,36 +10,59 @@ class Main {
     public static void main(String[] args) {
         System.out.println("Please enter an even integer greater than or equal to 4.");
         var scanner = new Scanner(System.in);
-        int n;
-        do {
+        int n = scanner.nextInt();
+        while (n < 4 || n % 2 != 0) {
+            System.out.println("Invalid integer, please try again");
             n = scanner.nextInt();
-        } while (n < 4 || n % 2 == 1);
-        // n is correct
+        }
+        // now variable n is correct
 
         // generate necessary arrays and threads
-        var threads = new ArrayList<Thread>(n);
+        List<Thread> threads;
         var knights = new ArrayList<Knight>(n);
-        var plates = new ArrayList<Plate>(n / 2);
-        var wineCups = new ArrayList<WineCup>(n / 2);
+        List<Plate> plates;
+        List<WineCup> wineCups;
         var centralWine = new WineCup(PartyHelper.maximumCentralWineGillCapacity);
         var partyLock = new ReentrantLock();
         var knightsToCheckAndWakeQueue = new ArrayDeque<CheckAndWaitUnit>();
         var knightsToCheckAndWakeSet = new HashSet<Knight>();
         final var nFinal = n;
-        IntStream.range(0, n / 2).forEach(i -> {
-            plates.add(new Plate(PartyHelper.maximumPlateCucumberCapacity));
-            wineCups.add(new WineCup(1));
-        });
+        final var nHalf = n / 2;
 
-        IntStream.range(0, n).forEach(i -> knights.add(
-                new Knight(nFinal, i, knights, partyLock, wineCups, plates, centralWine, knightsToCheckAndWakeQueue, knightsToCheckAndWakeSet)
-        ));
+        plates = IntStream.range(0, nHalf).
+                mapToObj(i -> new Plate(PartyHelper.maximumPlateCucumberCapacity)).
+                collect(Collectors.toList());
+
+        wineCups = IntStream.range(0, nHalf).
+                mapToObj(i -> new WineCup(PartyHelper.maximumLocalWineGillCapacity)).
+                collect(Collectors.toList());
+
+        for (int i = 0; i < n; i++) {
+            knights.add(
+                    new Knight(
+                            nFinal,
+                            i,
+                            knights,
+                            partyLock,
+                            wineCups,
+                            plates,
+                            centralWine,
+                            knightsToCheckAndWakeQueue,
+                            knightsToCheckAndWakeSet
+                    )
+            );
+        }
 
         // create threads
-        knights.forEach(knight -> threads.add(new Thread(knight)));
+        threads = knights.stream().map(Thread::new).collect(Collectors.toList());
 
-        threads.add(new Thread(new PickleServant(knights, partyLock, plates, knightsToCheckAndWakeQueue, knightsToCheckAndWakeSet)));
-        threads.add(new Thread(new WineGillServant(knights, partyLock, centralWine, knightsToCheckAndWakeQueue, knightsToCheckAndWakeSet)));
+        threads.add(new Thread(new PickleServant(
+                knights, partyLock, plates, knightsToCheckAndWakeQueue, knightsToCheckAndWakeSet
+        )));
+
+        threads.add(new Thread(new WineGillServant(
+                knights, partyLock, centralWine, knightsToCheckAndWakeQueue, knightsToCheckAndWakeSet
+        )));
 
         threads.forEach(Thread::start);
 

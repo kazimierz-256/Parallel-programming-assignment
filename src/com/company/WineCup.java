@@ -20,8 +20,8 @@ class WineCup {
         return gills.pop();
     }
 
-    public boolean putGill(WineGill gill) {
-        if (gills.size() >= maximumWineGillCapacity) {
+    public boolean pourGill(WineGill gill) {
+        if (gills.size() == maximumWineGillCapacity) {
             return false;
         } else {
             gills.push(gill);

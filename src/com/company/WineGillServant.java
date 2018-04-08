@@ -1,12 +1,11 @@
 package com.company;
 
-import java.util.ArrayDeque;
 import java.util.List;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.locks.Lock;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 class WineGillServant implements Runnable {
     private List<Knight> knights;
@@ -15,7 +14,12 @@ class WineGillServant implements Runnable {
     private Queue<CheckAndWaitUnit> knightsWakeQueue;
     private Set<Knight> knightsWakeSet;
 
-    public WineGillServant(List<Knight> knights, Lock partyLock, WineCup centralWine, ArrayDeque<CheckAndWaitUnit> knightsWakeQueue, Set<Knight> knightsWakeSet) {
+    public WineGillServant(
+            List<Knight> knights,
+            Lock partyLock,
+            WineCup centralWine,
+            Queue<CheckAndWaitUnit> knightsWakeQueue,
+            Set<Knight> knightsWakeSet) {
         this.knights = knights;
         this.partyLock = partyLock;
         this.centralWine = centralWine;
@@ -31,7 +35,7 @@ class WineGillServant implements Runnable {
             int time;
             time = PartyHelper.getRandomTime(0.5);
 
-            PartyHelper.signalFirstUnit(knightsWakeQueue, knightsWakeSet);
+            PartyHelper.signalFirstValidUnit(knightsWakeQueue, knightsWakeSet);
             partyLock.unlock();
 
             try {
@@ -50,18 +54,18 @@ class WineGillServant implements Runnable {
             else
                 System.out.printf("WineServant realised nobody drank the central wine%n");
 
-            IntStream.range(0, centralWine.missingGillCount()).forEach(i ->
-                    centralWine.putGill(new WineGill())
-            );
+            while (centralWine.missingGillCount() > 0) {
+                centralWine.pourGill(new WineGill());
+            }
 
             if (missingGills) {
                 knightsWakeQueue.addAll(
                         knights.stream().
-                                filter(Knight::isReadyToDrinkAndEat).
-                                filter(knight -> !knightsWakeSet.contains(knight)).
+                                filter(Knight::isAwaitingValidlyToDrinkAndEat).
+                                filter(((Predicate<Knight>) knightsWakeSet::contains).negate()).
                                 map(knight -> new CheckAndWaitUnit(
-                                        Knight::isReadyToDrinkAndEat,
                                         knight,
+                                        Knight::isAwaitingValidlyToDrinkAndEat,
                                         Knight::enableDrinking
                                 )).
                                 collect(Collectors.toList())
