@@ -11,7 +11,7 @@ class PartyHelper {
     static final int maximumPlateCucumberCapacity = 5;
     static final int maximumCentralWineGillCapacity = 8;
     static final int maximumLocalWineGillCapacity = 1;
-    private static final int minimumTimeMs = 10;
+    private static final int minimumTimeMs = 5000;
     private static final int maximumTimeMs = 2 * minimumTimeMs;
 
     private static Random random = new Random();
@@ -24,8 +24,8 @@ class PartyHelper {
         return getRandomInt(minimumTimeMs, maximumTimeMs);
     }
 
-    static int getRandomTime(double speedupFactor) {
-        return (int) (getRandomTime() * speedupFactor);
+    static int getRandomTime(double slowdownFactor) {
+        return (int) (getRandomTime() * slowdownFactor);
     }
 
     static int previousKnightId(int id, int n) {
@@ -48,11 +48,11 @@ class PartyHelper {
         return knights.stream().map(Knight::getState).allMatch(state -> state == KnightState.knockedOut);
     }
 
-    public static boolean signalFirstValidUnit(Queue<CheckAndWaitUnit> checkAndWaitUnits, Set<Knight> s) {
+    public static boolean signalFirstValidUnit(Queue<CheckAndWaitUnit> checkAndWaitUnits, Set<Knight> knightsInQueue) {
         while (checkAndWaitUnits.size() > 0) {
-            var unit = checkAndWaitUnits.remove();
-            s.remove(unit.getKnight());
-            if (unit.getAsBoolean())
+            var checkAndWaitUnit = checkAndWaitUnits.remove();
+            knightsInQueue.remove(checkAndWaitUnit.getKnight());
+            if (checkAndWaitUnit.getAsBoolean())
                 return true;
 
         }

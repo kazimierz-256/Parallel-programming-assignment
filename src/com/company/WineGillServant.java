@@ -61,8 +61,8 @@ class WineGillServant implements Runnable {
             if (missingGills) {
                 knightsWakeQueue.addAll(
                         knights.stream().
-                                filter(Knight::isAwaitingValidlyToDrinkAndEat).
-                                filter(((Predicate<Knight>) knightsWakeSet::contains).negate()).
+                                filter(knight -> knight.isAwaitingValidlyToDrinkAndEat()
+                                        && !knightsWakeSet.contains(knight)).
                                 map(knight -> new CheckAndWaitUnit(
                                         knight,
                                         Knight::isAwaitingValidlyToDrinkAndEat,

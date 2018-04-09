@@ -197,7 +197,7 @@ public class Knight implements Runnable {
 
         partyLock.lock();
         System.out.printf("%s finished drinkingAndEating.%n", describeOneself());
-        if (drunkenCups >= PartyHelper.maximumKnightDrinkingCapacity) {
+        if (drunkenCups == PartyHelper.maximumKnightDrinkingCapacity) {
             state = KnightState.knockedOut;
         }
     }
